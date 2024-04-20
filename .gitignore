@@ -155,8 +155,5 @@ Thumbs.db
 
 # Dependency directories
 node_modules/
-models/__pycache__/institucion.cpython-312.pyc
-models/__pycache__/roles.cpython-312.pyc
-models/__pycache__/user.cpython-312.pyc
-routes/__pycache__/institucion.cpython-312.pyc
-models/__pycache__/user.cpython-312.pyc
+
+*.pdf

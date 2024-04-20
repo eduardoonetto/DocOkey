@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from routes.users import router as user_router
 from routes.institucion import router as institucion_router
 from routes.roles import router as roles_router
+from routes.documentos import router as documentos_router
 from database.sqlite import initialize_database
 
 #Inicia el cliente API
@@ -12,3 +13,4 @@ initialize_database()
 app.include_router(user_router)
 app.include_router(institucion_router)
 app.include_router(roles_router)
+app.include_router(documentos_router)

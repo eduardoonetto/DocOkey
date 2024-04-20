@@ -30,24 +30,95 @@ def initialize_database():
             FOREIGN KEY(institucion_id) REFERENCES institucion(id)
             );
        ''')
+    # Crear Tabla document que contendra los documentos de los usuarios: codigo, nombre, fecha_creacion, archivo_b64:
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documentos(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            fecha_creacion TEXT NOT NULL,
+            archivo_b64 TEXT NOT NULL,
+            institucion_id INT NOT NULL,
+            FOREIGN KEY(institucion_id) REFERENCES institucion(id)
+        );
+    ''')
+    #crear tabla tipo firma que contendra el id y tipo_firma:
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tipo_firma(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo_firma TEXT NOT NULL
+        );
+    ''')
+
+    #ingresar firmar con pin pero validar que no exista previamente:
+    cursor.execute('''
+        SELECT * FROM tipo_firma WHERE tipo_firma = 'Firmar con Pin'
+    ''')
+
+    tipo_firma = cursor.fetchone()
+    if not tipo_firma:
+        cursor.execute('''
+            INSERT INTO tipo_firma(tipo_firma)
+            VALUES('Firmar con Pin')
+        ''')
+
+    #crear tabla firmantes que registrará el signer_rut, signer_role, signer_institucion, signer_name, signer_email, signer_type, documento_id:
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS firmantes(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            signer_rut TEXT NOT NULL,
+            signer_role TEXT NOT NULL,
+            signer_institucion TEXT NOT NULL,
+            signer_name TEXT NOT NULL,
+            signer_email TEXT NOT NULL,
+            signer_type TEXT NOT NULL,
+            documento_id INT NOT NULL,
+            FOREIGN KEY(documento_id) REFERENCES documentos(id)
+        );
+    ''') 
+    
     connection.commit() # Lanzo la accion
     connection.close() # cierro la conexion
 
 def create_user(username: str, rut: str, email: str, password: str):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
+    #validar que el rut no exista previamente
     cursor.execute('''
-        INSERT INTO users(username, rut, email, password)
-        VALUES(?, ?, ?, ?)
-    ''', (username, rut, email, password))
-    #cuando se cree un usuario, debe crearse una institucion personal para el usuario se dejara logo por defecto.
-    cursor.execute('''
-        INSERT INTO institucion(institucion, url_logo, rut_admin)
-        VALUES(?, ?, ?)
-    ''', (username, None, rut))
-    
-    connection.commit()
-    connection.close()
+        SELECT * FROM users WHERE rut = ?
+    ''', (rut,))
+    user = cursor.fetchone()
+    if user:
+        connection.close()
+        return 'El rut ya existe'
+    else:
+        #se crea el usuario:
+        cursor.execute('''
+            INSERT INTO users(username, rut, email, password)
+            VALUES(?, ?, ?, ?)
+        ''', (username, rut, email, password))
+        #cuando se cree un usuario, debe crearse una institucion personal para el usuario se dejara logo por defecto.
+        cursor.execute('''
+            INSERT INTO institucion(institucion, url_logo, rut_admin)
+            VALUES(?, ?, ?)
+        ''', (username.replace(" ", "_"), 'Personal', rut))
+        #añadir rol personal al usuario en su institucion personal
+        cursor.execute('''
+            SELECT id FROM users WHERE rut = ?
+        ''', (rut,))
+        user = cursor.fetchone()
+        if user:
+            cursor.execute('''
+                SELECT id FROM institucion WHERE rut_admin = ? and institucion = ?
+            ''', (rut, username.replace(" ", "_")))
+            institucion = cursor.fetchone()
+            if institucion:
+                cursor.execute('''
+                    INSERT INTO users_institucion_roles(user_id, institucion_id, role)
+                    VALUES(?, ?, ?)
+                ''', (user[0], institucion[0], 'personal'))
+                connection.commit()
+                connection.close()
+                return 'Usuario creado'
 
 def get_users():
     connection = sqlite3.connect('database.sqlite')
@@ -170,6 +241,7 @@ def get_role_by_institution(institucion: int):
         WHERE i.id = ?
     ''', (institucion,))
     roles = cursor.fetchall()
+    print(roles)
     roles = [
         {
             'id': role[0],
@@ -178,4 +250,73 @@ def get_role_by_institution(institucion: int):
             'role': role[3]
         }
         for role in roles
-    ] 
+    ]
+    return roles
+
+def get_role_by_rut(rut: str):
+    # Consultar un usuario por rut y mostrar todas las instituciones a las que pertenece con sus roles.
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT uir.id, u.username, i.institucion, uir.role
+        FROM users_institucion_roles uir
+        JOIN users u ON uir.user_id = u.id
+        JOIN institucion i ON uir.institucion_id = i.id
+        WHERE u.rut = ?
+    ''', (rut,))
+    roles = cursor.fetchall()
+    roles = [
+        {
+            'id': role[0],
+            'username': role[1],
+            'institucion': role[2],
+            'role': role[3]
+        }
+        for role in roles
+    ]
+    return roles
+
+# DOCUMENTOS
+
+def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_creacion: str, signers: list):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        INSERT INTO documentos(nombre, archivo_b64, institucion_id, fecha_creacion)
+        VALUES (?, ?, ?, ?)
+    ''', (nombre, archivo_b64, institucion_id, fecha_creacion))
+    documento_id = cursor.lastrowid
+    for signer in signers:
+        cursor.execute('''
+            INSERT INTO firmantes(signer_rut, signer_role, signer_institucion, signer_name, signer_email, signer_type, documento_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (signer.signer_rut, signer.signer_role, signer.signer_institucion, signer.signer_name, signer.signer_email, signer.signer_type, documento_id))
+    connection.commit()
+    connection.close()
+    return documento_id
+
+def get_documentos_by_rut_and_institucion_id(signer_rut: str, signer_institucion: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT d.nombre, d.fecha_creacion, d.archivo_b64, f.signer_rut, f.signer_role, f.signer_institucion, f.signer_name, f.signer_email, f.signer_type
+        FROM documentos d
+        JOIN firmantes f ON d.id = f.documento_id
+        WHERE f.signer_rut = ? AND f.signer_institucion = ?
+    ''', (signer_rut, signer_institucion))
+    documentos = cursor.fetchall()
+    documentos = [
+        {
+            'nombre': documento[0],
+            'fecha_creacion': documento[1],
+            'archivo_b64': documento[2],
+            'signer_rut': documento[3],
+            'signer_role': documento[4],
+            'signer_institucion': documento[5],
+            'signer_name': documento[6],
+            'signer_email': documento[7],
+            'signer_type': documento[8]
+        }
+        for documento in documentos
+    ]
+    return documentos
