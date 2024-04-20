@@ -22,13 +22,19 @@ def get_roles():
     return roles
 
 
-    Documentos
+Documentos
+----------
 Id
 archivo_b64
-Nombre Documento
+nombre_documento
 Institucion_id
 
 Firmantes
+--------
+id
 Rut_firmante
 documento_id
 tipo_firma
+
+empujar aplicacion:
+uvicorn main:app --reload

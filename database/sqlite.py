@@ -40,6 +40,12 @@ def create_user(username: str, rut: str, email: str, password: str):
         INSERT INTO users(username, rut, email, password)
         VALUES(?, ?, ?, ?)
     ''', (username, rut, email, password))
+    #cuando se cree un usuario, debe crearse una institucion personal para el usuario se dejara logo por defecto.
+    cursor.execute('''
+        INSERT INTO institucion(institucion, url_logo, rut_admin)
+        VALUES(?, ?, ?)
+    ''', (username, None, rut))
+    
     connection.commit()
     connection.close()
 

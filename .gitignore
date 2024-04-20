@@ -128,3 +128,35 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*cpython*.pyc
+# Caches and Logs
+*.log
+logs/
+
+# Environment and virtual environment files
+.env
+venv/
+.env.*
+*.sqlite3
+*.sqlite
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDEs (como VSCode, PyCharm, etc.)
+.idea/
+.vscode/
+
+# Dependency directories
+node_modules/
+models/__pycache__/institucion.cpython-312.pyc
+models/__pycache__/roles.cpython-312.pyc
+models/__pycache__/user.cpython-312.pyc
+routes/__pycache__/institucion.cpython-312.pyc
+models/__pycache__/user.cpython-312.pyc
