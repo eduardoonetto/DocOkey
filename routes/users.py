@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from models.user import User
-from database.sqlite import create_user, get_users, get_user
+from models.user import User, LoginUser
+from database.sqlite import create_user, get_users, get_user, login_user
 
 #Rutas de usuarios
 router = APIRouter()
@@ -23,5 +23,11 @@ async def get_user_routes(id: int):
     if users:
         return users
     return 'User not found'
+
+#login
+@router.post('/login')
+async def login_user_routes(user: LoginUser):
+    return login_user(user.user_rut, user.user_password)
+    
 
 

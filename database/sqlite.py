@@ -1,4 +1,6 @@
 import sqlite3
+import hashlib
+import time
 
 def initialize_database():
     connection = sqlite3.connect('database.sqlite')
@@ -19,6 +21,13 @@ def initialize_database():
             url_logo TEXT NOT NULL,
             rut_admin TEXT NOT NULL);
        ''')
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sessions (
+        session_id TEXT PRIMARY KEY,
+        expiration_timestamp INTEGER
+    )
+    """)
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users_institucion_roles(
@@ -72,6 +81,9 @@ def initialize_database():
             signer_email TEXT NOT NULL,
             signer_type TEXT NOT NULL,
             documento_id INT NOT NULL,
+            audit TEXT,
+            fecha_firma TEXT,
+            habilitado int,
             FOREIGN KEY(documento_id) REFERENCES documentos(id)
         );
     ''') 
@@ -320,3 +332,84 @@ def get_documentos_by_rut_and_institucion_id(signer_rut: str, signer_institucion
         for documento in documentos
     ]
     return documentos
+
+def get_firmantes_by_documento_id(documento_id: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT * FROM firmantes WHERE documento_id = ?
+    ''', (documento_id,))
+    firmantes = cursor.fetchall()
+    firmantes = [
+        {
+            'id': firmante[0],
+            'signer_rut': firmante[1],
+            'signer_role': firmante[2],
+            'signer_institucion': firmante[3],
+            'signer_name': firmante[4],
+            'signer_email': firmante[5],
+            'signer_type': firmante[6],
+            'documento_id': firmante[7]
+        }
+        for firmante in firmantes
+    ]
+    print(firmantes)
+    return firmantes
+
+def login_user(user_rut: str, user_password: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT * FROM users WHERE rut = ? AND password = ?
+    ''', (user_rut, user_password))
+    user = cursor.fetchone()
+    
+    #Genera un Hash para usar de session_id hace el import abajo de lo que requieras:
+    session_id = hashlib.sha256(f"{user_rut}{time.time()}".encode()).hexdigest()
+    expiration_timestamp = int(time.time()) + 3600
+    insert_session(session_id, expiration_timestamp)
+    if user:
+        user = {
+            'id': user[0],
+            'username': user[1],
+            'email': user[2],
+            'password': user[3],
+            'session_id': session_id
+        }
+    connection.close()
+
+
+    return user
+
+def insert_session(session_id: str, expiration_timestamp: int):
+    conn = sqlite3.connect('database.sqlite')
+    cursor = conn.cursor()
+
+    cursor.execute("INSERT INTO sessions (session_id, expiration_timestamp) VALUES (?, ?)",
+                   (session_id, expiration_timestamp))
+
+    conn.commit()
+    conn.close()
+
+def get_session_expiration_timestamp(session_id: str) -> int:
+    conn = sqlite3.connect('database.sqlite')
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT expiration_timestamp FROM sessions WHERE session_id = ?", (session_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if result:
+        return result[0]
+    else:
+        return None
+
+def delete_session(session_id: str):
+    conn = sqlite3.connect('database.sqlite')
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+
+    conn.commit()
+    conn.close()

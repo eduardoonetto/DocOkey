@@ -11,5 +11,5 @@ class User(BaseModel):
 
 #Datos de usuario para el login
 class LoginUser(BaseModel):
-    email: str
-    password: str
+    user_rut: str
+    user_password: str
