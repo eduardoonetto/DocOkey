@@ -21,7 +21,7 @@ async def session_middleware(request: Request, call_next):
     path = request.url.path
 
     # Excluir validación para el endpoint de login
-    if path == "/login":
+    if path == "/login" or path == "/docs" or path == "/openapi.json" or path == "/users/registro":
         response = await call_next(request)
         return response
 

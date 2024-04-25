@@ -258,8 +258,9 @@ def get_role_by_institution(institucion: int):
         {
             'id': role[0],
             'username': role[1],
-            'institucion': role[2],
-            'role': role[3]
+            'rut': role[2],
+            'institucion': role[3],
+            'role': role[4]
         }
         for role in roles
     ]
@@ -275,6 +276,7 @@ def get_role_by_rut(rut: str):
         JOIN users u ON uir.user_id = u.id
         JOIN institucion i ON uir.institucion_id = i.id
         WHERE u.rut = ?
+        ORDER BY uir.role
     ''', (rut,))
     roles = cursor.fetchall()
     roles = [
@@ -413,3 +415,33 @@ def delete_session(session_id: str):
 
     conn.commit()
     conn.close()
+
+
+def get_users_by_institucion(institucion_id: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT u.username, u.rut,  u.email, uir.role
+        FROM users_institucion_roles uir
+        JOIN users u ON uir.user_id = u.id
+        WHERE uir.institucion_id = ?
+    ''', (institucion_id,))
+    usuarios = cursor.fetchall()
+    users = {
+        'admin': [],
+        'trabajador': []
+    }
+    for user in usuarios:
+        if user[3] == 'admin':
+            users['admin'].append({
+                'username': user[0],
+                'rut': user[1],
+                'email': user[2]
+            })
+        elif user[3] == 'trabajador':
+            users['trabajador'].append({
+                'username': user[0],
+                'rut': user[1],
+                'email': user[2]
+            })
+    return users
