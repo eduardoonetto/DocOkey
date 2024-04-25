@@ -370,6 +370,7 @@ def login_user(user_rut: str, user_password: str):
     session_id = hashlib.sha256(f"{user_rut}{time.time()}".encode()).hexdigest()
     expiration_timestamp = int(time.time()) + 3600
     insert_session(session_id, expiration_timestamp)
+
     if user:
         user = {
             'id': user[0],
@@ -445,3 +446,16 @@ def get_users_by_institucion(institucion_id: int):
                 'email': user[2]
             })
     return users
+
+#funcion para desencriptar la session id y obtener el user_rut de la session_id:
+def get_user_rut_by_session_id(session_id: str):
+    conn = sqlite3.connect('database.sqlite')
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT session_id FROM sessions WHERE session_id = ? AND expiration_timestamp > ?
+    ''', (session_id, int(time.time())))
+    session = cursor.fetchone()
+    #extrae user_rut de la session_id hasheada no de la tabla:
+    user_rut = session_id[:session_id.index(str(int(time.time())))]
+    print(user_rut)
+    return user_rut

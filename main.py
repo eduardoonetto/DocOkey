@@ -30,7 +30,7 @@ async def session_middleware(request: Request, call_next):
     if not session_id_valid(session_id):
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"message": "Invalid or expired session"}
+            content={"message": "Session_id Invalida o expirada"}
         )
 
     response = await call_next(request)
