@@ -25,7 +25,8 @@ def initialize_database():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sessions (
         session_id TEXT PRIMARY KEY,
-        expiration_timestamp INTEGER
+        expiration_timestamp INTEGER,
+        user_rut TEXT NOT NULL
     )
     """)
     
@@ -369,7 +370,7 @@ def login_user(user_rut: str, user_password: str):
     #Genera un Hash para usar de session_id hace el import abajo de lo que requieras:
     session_id = hashlib.sha256(f"{user_rut}{time.time()}".encode()).hexdigest()
     expiration_timestamp = int(time.time()) + 3600
-    insert_session(session_id, expiration_timestamp)
+    insert_session(session_id, expiration_timestamp, user_rut)
 
     if user:
         user = {
@@ -384,12 +385,12 @@ def login_user(user_rut: str, user_password: str):
 
     return user
 
-def insert_session(session_id: str, expiration_timestamp: int):
+def insert_session(session_id: str, expiration_timestamp: int, user_rut: str):
     conn = sqlite3.connect('database.sqlite')
     cursor = conn.cursor()
 
-    cursor.execute("INSERT INTO sessions (session_id, expiration_timestamp) VALUES (?, ?)",
-                   (session_id, expiration_timestamp))
+    cursor.execute("INSERT INTO sessions (session_id, expiration_timestamp,user_rut) VALUES (?, ?, ?)",
+                   (session_id, expiration_timestamp,user_rut))
 
     conn.commit()
     conn.close()
