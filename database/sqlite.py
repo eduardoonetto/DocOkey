@@ -83,7 +83,7 @@ def initialize_database():
             documento_id INT NOT NULL,
             audit TEXT,
             fecha_firma TEXT,
-            habilitado int,
+            habilitado int default 1,
             FOREIGN KEY(documento_id) REFERENCES documentos(id)
         );
     ''') 
