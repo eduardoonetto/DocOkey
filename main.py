@@ -10,10 +10,18 @@ from routes.firmante    import router as firmante_router
 from database.sqlite    import initialize_database
 from utils.session_validation import session_id_valid
 import time
-
+from fastapi.middleware.cors import CORSMiddleware
 #Inicia el cliente API
 app = FastAPI()
 
+# Configuración de CORS para permitir solicitudes desde el origen de tu aplicación Ionic
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["localhost:8100", "http://localhost:8100", "http://localhost:8100/", "http://localhost:8100", "http://localhost:8100/"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 @app.middleware("http")
 async def session_middleware(request: Request, call_next):
