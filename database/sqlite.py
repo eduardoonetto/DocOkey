@@ -1,10 +1,12 @@
 import sqlite3
 import hashlib
 import time
+from datetime import datetime
 
 def initialize_database():
     connection = sqlite3.connect('database.sqlite')
-    cursor = connection.cursor() #Creo un cursor
+    cursor = connection.cursor()
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,21 +16,23 @@ def initialize_database():
             password TEXT NOT NULL
         );
     ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS institucion(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             institucion TEXT NOT NULL,
             url_logo TEXT NOT NULL,
-            rut_admin TEXT NOT NULL);
-       ''')
+            rut_admin TEXT NOT NULL
+        );
+    ''')
     
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS sessions (
-        session_id TEXT PRIMARY KEY,
-        expiration_timestamp INTEGER,
-        user_rut TEXT NOT NULL
-    )
-    """)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            expiration_timestamp INTEGER,
+            user_rut TEXT NOT NULL
+        );
+    ''')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users_institucion_roles(
@@ -38,9 +42,9 @@ def initialize_database():
             role TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id),
             FOREIGN KEY(institucion_id) REFERENCES institucion(id)
-            );
-       ''')
-    # Crear Tabla document que contendra los documentos de los usuarios: codigo, nombre, fecha_creacion, archivo_b64:
+        );
+    ''')
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS documentos(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,27 +55,24 @@ def initialize_database():
             FOREIGN KEY(institucion_id) REFERENCES institucion(id)
         );
     ''')
-    #crear tabla tipo firma que contendra el id y tipo_firma:
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tipo_firma(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tipo_firma TEXT NOT NULL
         );
     ''')
-
-    #ingresar firmar con pin pero validar que no exista previamente:
+    
     cursor.execute('''
         SELECT * FROM tipo_firma WHERE tipo_firma = 'Firmar con Pin'
     ''')
-
     tipo_firma = cursor.fetchone()
     if not tipo_firma:
         cursor.execute('''
             INSERT INTO tipo_firma(tipo_firma)
             VALUES('Firmar con Pin')
         ''')
-
-    #crear tabla firmantes que registrará el signer_rut, signer_role, signer_institucion, signer_name, signer_email, signer_type, documento_id:
+    
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS firmantes(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,10 +88,22 @@ def initialize_database():
             habilitado int default 1,
             FOREIGN KEY(documento_id) REFERENCES documentos(id)
         );
-    ''') 
+    ''')
     
-    connection.commit() # Lanzo la accion
-    connection.close() # cierro la conexion
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS registro_cambios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            accion TEXT NOT NULL,
+            document_id INTEGER NOT NULL,
+            fecha TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(document_id) REFERENCES documentos(id)
+        );
+    ''')
+    
+    connection.commit()
+    connection.close()
 
 def create_user(username: str, rut: str, email: str, password: str):
     connection = sqlite3.connect('database.sqlite')
@@ -460,3 +473,75 @@ def get_user_rut_by_session_id(session_id: str):
     user_rut = session_id[:session_id.index(str(int(time.time())))]
     print(user_rut)
     return user_rut
+
+
+    def sign_document(document_id: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    # Actualizar el estado del documento a 'firmado'
+    cursor.execute('''
+        UPDATE documentos
+        SET estado = 'firmado'
+        WHERE id = ?
+    ''', (document_id,))
+    connection.commit()
+    connection.close()
+
+def reject_document(document_id: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    # Actualizar el estado del documento a 'rechazado'
+    cursor.execute('''
+        UPDATE documentos
+        SET estado = 'rechazado'
+        WHERE id = ?
+    ''', (document_id,))
+    connection.commit()
+    connection.close()
+
+def create_audit_entry(document_id: int, audit_hash: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    # Guardar el hash de la auditoría en la tabla de firmantes
+    cursor.execute('''
+        INSERT INTO firmantes (auditoria)
+        VALUES (?)
+    ''', (audit_hash,))
+    connection.commit()
+    connection.close()
+
+def log_action(user_id: int, action: str, document_id: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    # Registrar la acción en el registro de cambios
+    cursor.execute('''
+        INSERT INTO registro_cambios (user_id, accion, document_id, fecha)
+        VALUES (?, ?, ?, ?)
+    ''', (user_id, action, document_id, datetime.now()))
+    connection.commit()
+    connection.close()
+
+def get_firmantes():
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('SELECT * FROM firmantes')
+    firmantes = cursor.fetchall()
+    # añadir key al value retornado
+    firmantes = [
+        {
+            'id': firmante[0],
+            'signer_rut': firmante[1],
+            'signer_role': firmante[2],
+            'signer_institucion': firmante[3],
+            'signer_name': firmante[4],
+            'signer_email': firmante[5],
+            'signer_type': firmante[6],
+            'documento_id': firmante[7],
+            'audit': firmante[8],
+            'fecha_firma': firmante[9],
+            'habilitado': firmante[10]
+        }
+        for firmante in firmantes
+    ]
+    connection.close()
+    return firmantes
