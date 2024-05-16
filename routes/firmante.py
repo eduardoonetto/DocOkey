@@ -16,3 +16,8 @@ async def get_firmantes(documento_id: int):
 async def get_usuarios(institucion_id: int):
     usuarios = get_users_by_institucion(institucion_id)
     return usuarios
+
+#Firmar Documentos:
+@router.post('/firmante/firmar')
+async def firmar_documento():
+    return {'msg': 'Firmado', 'status': 'OK'}

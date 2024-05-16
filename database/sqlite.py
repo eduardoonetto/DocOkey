@@ -86,10 +86,11 @@ def initialize_database():
             audit TEXT,
             fecha_firma TEXT,
             habilitado int default 1,
+            tipo_accion int default 0,
             FOREIGN KEY(documento_id) REFERENCES documentos(id)
         );
     ''')
-    
+    #tipo_accion: 0 para pendiente, 1 para firmado, 2 para rechazado
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS registro_cambios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -475,17 +476,17 @@ def get_user_rut_by_session_id(session_id: str):
     return user_rut
 
 
-    def sign_document(document_id: int):
+def sign_document(document_id: int):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
     # Actualizar el estado del documento a 'firmado'
-    cursor.execute('''
-        UPDATE documentos
-        SET estado = 'firmado'
-        WHERE id = ?
-    ''', (document_id,))
-    connection.commit()
-    connection.close()
+    #cursor.execute('''
+    #    UPDATE documentos
+    #    SET estado = 'Firmado'
+    #    WHERE id = ?
+    #''', (document_id,))
+    #connection.commit()
+    #connection.close()
 
 def reject_document(document_id: int):
     connection = sqlite3.connect('database.sqlite')
@@ -493,7 +494,7 @@ def reject_document(document_id: int):
     # Actualizar el estado del documento a 'rechazado'
     cursor.execute('''
         UPDATE documentos
-        SET estado = 'rechazado'
+        SET estado = 'Declinado'
         WHERE id = ?
     ''', (document_id,))
     connection.commit()
