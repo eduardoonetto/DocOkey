@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from models.documentos import Documentos
 from models.document_action import DocumentAction
 from database.sqlite import (
@@ -11,15 +11,16 @@ from database.sqlite import (
 )
 import hashlib
 from datetime import datetime
+from fastapi.security import APIKeyHeader
 
 router = APIRouter()
+session_id = APIKeyHeader(name="Authorization")
 
 # Subir Documento a tabla documentos
 @router.post('/documento/subir')
-async def upload_file(documento: Documentos):
-    print(documento.nombre_documento, documento.archivo_b64, documento.institucion_id, documento.fecha_creacion)
-    documento_id = add_documento(documento.nombre_documento, documento.archivo_b64, documento.institucion_id, documento.fecha_creacion, documento.signers)
-    return {documento.nombre_documento: documento.nombre_documento, "documento_id": documento_id}
+async def upload_file(documento: Documentos, Authorization: str = Depends(session_id)):
+    response = add_documento(documento.nombre_documento, documento.archivo_b64, documento.institucion_id, documento.fecha_creacion, documento.signers, Authorization)
+    return response
 
 # Listar Documentos de un firmante según su signer_rut e institucion_id
 @router.get('/documento/listar/{signer_rut}/{signer_institucion}')

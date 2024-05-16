@@ -116,7 +116,7 @@ def create_user(username: str, rut: str, email: str, password: str):
     user = cursor.fetchone()
     if user:
         connection.close()
-        return 'El rut ya existe'
+        return {'msg': 'El rut ya existe', 'status': 'ERROR'}
     else:
         #se crea el usuario:
         cursor.execute('''
@@ -145,7 +145,7 @@ def create_user(username: str, rut: str, email: str, password: str):
                 ''', (user[0], institucion[0], 'personal'))
                 connection.commit()
                 connection.close()
-                return 'Usuario creado'
+                return {'msg': 'Usuario creado', 'status': 'OK', 'user_id': user[0], 'username': username, 'rut': rut, 'email': email}
 
 def get_users():
     connection = sqlite3.connect('database.sqlite')
@@ -307,9 +307,29 @@ def get_role_by_rut(rut: str):
 
 # DOCUMENTOS
 
-def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_creacion: str, signers: list):
+def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_creacion: str, signers: list, session_id: str):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
+    #Si la institucion no existe o es Personal, no se puede agregar un documento:
+    cursor.execute('''
+        SELECT * FROM institucion WHERE id = ?
+    ''', (institucion_id,))
+    institucion = cursor.fetchone()
+    if not institucion or institucion[2] == 'Personal':
+        connection.close()
+        return {'msg': 'No se puede agregar un documento a esta institucion', 'status': 'ERROR'}
+    #Validar que la persona de la session_id tenga un rol admin dentro de la institucion, primero extraer el useR_rut de la session_id:
+    user_rut = get_user_rut_by_session_id(session_id)
+    cursor.execute('''
+        SELECT uir.role FROM users_institucion_roles uir
+        JOIN users u ON uir.user_id = u.id
+        WHERE u.rut = ? AND uir.institucion_id = ? AND uir.role = 'admin'
+    ''', (user_rut, institucion_id))
+    user = cursor.fetchone()
+    if not user:
+        connection.close()
+        return {'msg': 'No tienes permisos para agregar un documento a esta institucion', 'status': 'ERROR'}
+    #Si la persona de la session_id tiene un rol admin dentro de la institucion, se puede agregar un documento:
     cursor.execute('''
         INSERT INTO documentos(nombre, archivo_b64, institucion_id, fecha_creacion)
         VALUES (?, ?, ?, ?)
@@ -322,7 +342,7 @@ def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_crea
         ''', (signer.signer_rut, signer.signer_role, signer.signer_institucion, signer.signer_name, signer.signer_email, signer.signer_type, documento_id))
     connection.commit()
     connection.close()
-    return documento_id
+    return {'msg': 'Documento agregado', 'coddocumento': documento_id ,'status': 'OK'}
 
 def get_documentos_by_rut_and_institucion_id(signer_rut: str, signer_institucion: str):
     connection = sqlite3.connect('database.sqlite')
@@ -394,6 +414,8 @@ def login_user(user_rut: str, user_password: str):
             'password': user[3],
             'session_id': session_id
         }
+    else:
+        user = {'msg': 'Usuario no encontrado', 'status': 'ERROR'}
     connection.close()
 
 
@@ -467,7 +489,7 @@ def get_user_rut_by_session_id(session_id: str):
     conn = sqlite3.connect('database.sqlite')
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT session_id FROM sessions WHERE session_id = ? AND expiration_timestamp > ?
+        SELECT user_rut FROM sessions WHERE session_id = ? AND expiration_timestamp > ?
     ''', (session_id, int(time.time())))
     session = cursor.fetchone()
     #extrae user_rut de la session_id hasheada no de la tabla:

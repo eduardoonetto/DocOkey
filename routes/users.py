@@ -9,7 +9,7 @@ router = APIRouter()
 @router.post('/users/registro')
 async def create_user_routes(user: User):
     res = create_user(user.username,user.rut, user.email, user.password)
-    return {'msg': res, 'status': 'OK'}
+    return res
 
 #CONSULTAR ALL:
 @router.get('/users')
