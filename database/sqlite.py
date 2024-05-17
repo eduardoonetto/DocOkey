@@ -268,7 +268,6 @@ def get_role_by_institution(institucion: int):
         WHERE i.id = ?
     ''', (institucion,))
     roles = cursor.fetchall()
-    print(roles)
     roles = [
         {
             'id': role[0],
@@ -329,6 +328,36 @@ def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_crea
     if not user:
         connection.close()
         return {'msg': 'No tienes permisos para agregar un documento a esta institucion', 'status': 'ERROR'}
+    #Validar que los firmantes tengan el rol dentro de la institucion:
+    for signer in signers:
+        #primero extraer el user_id del firmante:
+        cursor.execute('''
+            SELECT id FROM users WHERE rut = ?
+        ''', (signer.signer_rut,))
+        
+        user = cursor.fetchone()
+        if not user:
+            connection.close()
+            return {'msg': 'El firmante no existe', 'status': 'ERROR'}
+    
+        #Extraer institucion_id desde el signer_institucion:
+        #si signer_institucion es Personal Omitir esta validacion y obtener el user_id del firmante:
+        if signer.signer_institucion != 'Personal':
+            cursor.execute('''
+                SELECT id FROM institucion WHERE institucion = ?
+            ''', (signer.signer_institucion,))
+            institucion = cursor.fetchone()
+            if not institucion:
+                connection.close()
+                return {'msg': 'La institucion del firmante no existe', 'status': 'ERROR'}
+            #Validar que signer_role y signer_institucion coincidan con la base de datos:
+            cursor.execute('''
+                SELECT * FROM users_institucion_roles WHERE user_id = ? AND role = ? AND institucion_id = ?
+            ''', (user[0], signer.signer_role, institucion[0]))
+            user = cursor.fetchone()
+            if not user:
+                connection.close()
+                return {'msg': 'El firmante no tiene el rol correcto en la institucion', 'status': 'ERROR'}
     #Si la persona de la session_id tiene un rol admin dentro de la institucion, se puede agregar un documento:
     cursor.execute('''
         INSERT INTO documentos(nombre, archivo_b64, institucion_id, fecha_creacion)
@@ -390,7 +419,6 @@ def get_firmantes_by_documento_id(documento_id: int):
         }
         for firmante in firmantes
     ]
-    print(firmantes)
     return firmantes
 
 def login_user(user_rut: str, user_password: str):
@@ -491,11 +519,10 @@ def get_user_rut_by_session_id(session_id: str):
     cursor.execute('''
         SELECT user_rut FROM sessions WHERE session_id = ? AND expiration_timestamp > ?
     ''', (session_id, int(time.time())))
-    session = cursor.fetchone()
-    #extrae user_rut de la session_id hasheada no de la tabla:
-    user_rut = session_id[:session_id.index(str(int(time.time())))]
-    print(user_rut)
-    return user_rut
+    user_rut = cursor.fetchone()
+    conn.close()
+    if user_rut:
+        return user_rut[0]
 
 
 def sign_document(document_id: int):
@@ -522,16 +549,28 @@ def reject_document(document_id: int):
     connection.commit()
     connection.close()
 
-def create_audit_entry(document_id: int, audit_hash: str):
+def create_audit_entry(audit_hash: str, document_id: int, rut_user: str, role: str, tipo_accion: int):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
-    # Guardar el hash de la auditoría en la tabla de firmantes
+    #Validar que el documento no haya sido firmado previamente por este usuario:
     cursor.execute('''
-        INSERT INTO firmantes (auditoria)
-        VALUES (?)
-    ''', (audit_hash,))
+        SELECT 1 FROM firmantes WHERE documento_id = ? AND signer_rut = ? AND signer_role = ? AND habilitado = 1
+    ''', (document_id, rut_user, role))
+    firmante = cursor.fetchone()
+    if not firmante:
+        return False
+    # Crear una entrada de auditoría para el documento firmado
+    query = cursor.execute('''
+        UPDATE firmantes
+        SET audit = ?, fecha_firma = ?, tipo_accion = ?, habilitado = ?
+        WHERE documento_id = ? AND signer_rut = ? AND signer_role = ?
+    ''', (audit_hash, datetime.now(), tipo_accion, 0, document_id, rut_user, role,))
     connection.commit()
     connection.close()
+    #Valida si se hizo o no:
+    if query.rowcount == 0:
+        return False
+    return True
 
 def log_action(user_id: int, action: str, document_id: int):
     connection = sqlite3.connect('database.sqlite')
@@ -568,3 +607,19 @@ def get_firmantes():
     ]
     connection.close()
     return firmantes
+
+
+#Validar user_password y user_rut en la base de datos:
+def validate_user(user_rut: str, user_password: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+        SELECT * FROM users WHERE rut = ? AND password = ?
+    ''', (user_rut, user_password))
+    user = cursor.fetchone()
+    if user:
+        r = True
+    else:
+        r = False
+    connection.close()
+    return r
