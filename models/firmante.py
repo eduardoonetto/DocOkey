@@ -8,3 +8,9 @@ class Firmante(BaseModel):
     signer_name: str
     signer_email: str
     signer_type: int
+
+class Firma(BaseModel):
+  user_password: str
+  tipo_accion: int
+  id_documento: int
+  role: str
