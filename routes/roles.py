@@ -21,3 +21,8 @@ async def get_role_routes(institucion_id: int):
 @router.get('/roles_by_rut/{rut}')
 async def get_role_routes(rut: str):
     return get_role_by_rut(rut)
+
+#CONSULTAR roles by rut que sean Admins:
+@router.get('/roles_by_rut_admin/{rut}')
+async def get_role_routes(rut: str):
+    return get_role_by_rut(rut, "admin")

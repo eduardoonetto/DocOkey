@@ -280,25 +280,40 @@ def get_role_by_institution(institucion: int):
     ]
     return roles
 
-def get_role_by_rut(rut: str):
+def get_role_by_rut(rut: str, role: str = None):
     # Consultar un usuario por rut y mostrar todas las instituciones a las que pertenece con sus roles.
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
-    cursor.execute('''
-        SELECT uir.id, u.username, i.institucion, uir.role
-        FROM users_institucion_roles uir
-        JOIN users u ON uir.user_id = u.id
-        JOIN institucion i ON uir.institucion_id = i.id
-        WHERE u.rut = ?
-        ORDER BY uir.role
-    ''', (rut,))
+    if role:
+        cursor.execute('''
+            SELECT i.institucion
+            FROM users_institucion_roles uir
+            JOIN users u ON uir.user_id = u.id
+            JOIN institucion i ON uir.institucion_id = i.id
+            WHERE u.rut = ? AND uir.role = ?
+        ''', (rut, role))
+        instituciones_vinculadas = cursor.fetchall()
+        #devolver solo el nombre de la institucion {institucion: [nombre_institucion, nombre_institucion]}:
+        instituciones_vinculadas = {
+            'instituciones': [institucion[0] for institucion in instituciones_vinculadas]
+        }
+        return instituciones_vinculadas
+    else:
+        cursor.execute('''
+            SELECT uir.id, u.username, u.rut, i.institucion, uir.role
+            FROM users_institucion_roles uir
+            JOIN users u ON uir.user_id = u.id
+            JOIN institucion i ON uir.institucion_id = i.id
+            WHERE u.rut = ?
+        ''', (rut,))
     roles = cursor.fetchall()
     roles = [
         {
             'id': role[0],
             'username': role[1],
-            'institucion': role[2],
-            'role': role[3]
+            'rut': role[2],
+            'institucion': role[3],
+            'role': role[4]
         }
         for role in roles
     ]
@@ -437,9 +452,9 @@ def login_user(user_rut: str, user_password: str):
     if user:
         user = {
             'id': user[0],
-            'username': user[1],
-            'email': user[2],
-            'password': user[3],
+            'rut': user[1],
+            'username': user[2],
+            'email': user[3],
             'session_id': session_id
         }
     else:
