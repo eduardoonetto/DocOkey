@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 # Rutas
 from routes.users import router as user_router
@@ -10,12 +10,8 @@ from routes.firma import router as firma_router
 # Queries
 from database.sqlite import initialize_database
 from utils.session_validation import session_id_valid
-import time
 from fastapi.middleware.cors import CORSMiddleware
-from models.document_action import DocumentAction
-from database.sqlite import sign_document, reject_document, create_audit_entry, log_action
-import hashlib
-from datetime import datetime
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Inicia el cliente API
 app = FastAPI()
@@ -23,53 +19,52 @@ app = FastAPI()
 # Configuración de CORS para permitir solicitudes desde el origen de tu aplicación Ionic
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["localhost:8100", "http://localhost:8100", "http://localhost:8100/", "http://localhost:8100", "http://localhost:8100/"],
+    allow_origins=["http://localhost:8100"],  # Corrige la URL, elimina la barra diagonal al final
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.middleware("http")
-async def session_middleware(request: Request, call_next):
-    # Obtenemos el path de la solicitud
-    path = request.url.path
+# Middleware para agregar encabezados CORS a todas las respuestas
+class AddCORSHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8100'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS, PUT, DELETE'
+        response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+        return response
 
-    # Excluir validación para el endpoint de login
-    if path in ["/login", "/docs", "/openapi.json", "/users/registro"]:
+app.add_middleware(AddCORSHeadersMiddleware)
+
+@app.middleware("http")
+async def print_request_headers(request: Request, call_next):
+    headers = request.headers
+    # Imprimir los encabezados en la consola
+    print("Request headers:")
+    print(headers)
+    session_id = request.headers.get("Authorization")
+    print(f"Session ID: {session_id}")
+
+    path = request.url.path
+    if path in ["/login", "/docs", "/openapi.json", "/users/registro"] or request.method == "OPTIONS":
         response = await call_next(request)
         return response
 
-    session_id = request.headers.get("Authorization")
+    print("Validating session ID")
+    if not session_id or not session_id_valid(session_id):
+        return JSONResponse(status_code=401, content={"message": "Unauthorized"})
 
-    if not session_id_valid(session_id):
-        return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"message": "Session Invalida o session expirada."}
-        )
-
+    # Continuar con la solicitud
     response = await call_next(request)
     return response
 
-@app.post("/document/action")
-async def handle_document_action(action: DocumentAction):
-    if action.action == "sign":
-        sign_document(action.document_id)
-    elif action.action == "reject":
-        reject_document(action.document_id)
-    else:
-        raise HTTPException(status_code=400, detail="Acción no válida. Use 'sign' o 'reject'.")
-
-    # Generar la cadena combinada y hashearla
-    audit_info = f"{action.session_id[:6]}-{action.rut}-{action.role}-{action.document_id}-{datetime.now()}"
-    audit_hash = hashlib.sha256(audit_info.encode()).hexdigest()
-    
-    # Guardar la información hasheada en el campo de auditoría
-    create_audit_entry(action.document_id, audit_hash)
-
-    # Registrar la acción en el registro de cambios
-    log_action(action.session_id, action.action, action.document_id)
-
-    return {"message": f"Documento {action.document_id} {action.action}ado."}  # Se retorna un mensaje de éxito
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return JSONResponse(status_code=200, headers={
+        'Access-Control-Allow-Origin': 'http://localhost:8100',
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type'
+    })
 
 # Crea o añade nuevas tablas a la base de datos
 initialize_database()
