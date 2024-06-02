@@ -388,15 +388,15 @@ def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_crea
     connection.close()
     return {'msg': 'Documento agregado', 'coddocumento': documento_id ,'status': 'OK'}
 
-def get_documentos_by_rut_and_institucion_id(signer_rut: str, signer_institucion: str):
+def get_documentos_by_rut_and_institucion_id(signer_rut: str):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
     cursor.execute('''
-        SELECT d.nombre, d.fecha_creacion, d.archivo_b64, f.signer_rut, f.signer_role, f.signer_institucion, f.signer_name, f.signer_email, f.signer_type
+        SELECT d.nombre, f.signer_name, f.signer_email, f.signer_type
         FROM documentos d
         JOIN firmantes f ON d.id = f.documento_id
-        WHERE f.signer_rut = ? AND f.signer_institucion = ?
-    ''', (signer_rut, signer_institucion))
+        WHERE f.signer_rut = ?
+    ''', (signer_rut))
     documentos = cursor.fetchall()
     documentos = [
         {
@@ -569,7 +569,7 @@ def create_audit_entry(audit_hash: str, document_id: int, rut_user: str, role: s
     cursor = connection.cursor()
     #Validar que el documento no haya sido firmado previamente por este usuario:
     cursor.execute('''
-        SELECT 1 FROM firmantes WHERE documento_id = ? AND signer_rut = ? AND signer_role = ? AND habilitado = 1
+        SELECT 1 FROM firmantes WHERE documento_id = ? AND signer_rut = ? AND UPPER(signer_role) = ? AND habilitado = 1
     ''', (document_id, rut_user, role))
     firmante = cursor.fetchone()
     if not firmante:
@@ -578,7 +578,7 @@ def create_audit_entry(audit_hash: str, document_id: int, rut_user: str, role: s
     query = cursor.execute('''
         UPDATE firmantes
         SET audit = ?, fecha_firma = ?, tipo_accion = ?, habilitado = ?
-        WHERE documento_id = ? AND signer_rut = ? AND signer_role = ?
+        WHERE documento_id = ? AND signer_rut = ? AND UPPER(signer_role) = ?
     ''', (audit_hash, datetime.now(), tipo_accion, 0, document_id, rut_user, role,))
     connection.commit()
     connection.close()
@@ -638,3 +638,30 @@ def validate_user(user_rut: str, user_password: str):
         r = False
     connection.close()
     return r
+
+
+def get_document_by_rut(signer_rut: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    #Trae Nombre documento, nombre institucion del documento, id_documento:
+    cursor.execute('''
+                    SELECT d.id, d.nombre, i.institucion, i.url_logo, UPPER(f.signer_role)
+                    FROM firmantes f
+                    JOIN documentos d ON f.documento_id = d.id
+                    JOIN institucion i ON d.institucion_id = i.id
+                    WHERE f.signer_rut = ?
+                    AND f.habilitado = 1
+                    ''', (signer_rut,))
+    documentos = cursor.fetchall()
+    documentos = [
+        {
+            'id': documento[0],
+            'nombre': documento[1],
+            'institucion': documento[2],
+            'logo': documento[3],
+            'role': documento[4]
+        }
+        for documento in documentos
+    ]
+    return documentos
+    

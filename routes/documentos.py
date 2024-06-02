@@ -3,7 +3,7 @@ from models.documentos import Documentos
 from models.document_action import DocumentAction
 from database.sqlite import (
     add_documento,
-    get_documentos_by_rut_and_institucion_id,
+    get_document_by_rut,
     sign_document,
     reject_document,
     create_audit_entry,
@@ -23,9 +23,9 @@ async def upload_file(documento: Documentos, Authorization: str = Depends(sessio
     return response
 
 # Listar Documentos de un firmante según su signer_rut e institucion_id
-@router.get('/documento/listar/{signer_rut}/{signer_institucion}')
-async def get_documentos(signer_rut: str, signer_institucion: str):
-    return get_documentos_by_rut_and_institucion_id(signer_rut, signer_institucion)
+@router.get('/documento/listar/{signer_rut}')
+async def get_documentos(signer_rut: str):
+    return get_document_by_rut(signer_rut)
 
 # Manejar acción de documento (firmar o rechazar)
 @router.post("/document/action")
