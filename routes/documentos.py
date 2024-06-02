@@ -7,7 +7,8 @@ from database.sqlite import (
     sign_document,
     reject_document,
     create_audit_entry,
-    log_action
+    log_action,
+    getDocument
 )
 import hashlib
 from datetime import datetime
@@ -48,3 +49,8 @@ async def handle_document_action(action: DocumentAction):
     log_action(action.session_id, action.action, action.document_id)
 
     return {"message": f"Documento {action.document_id} {action.action}ado."}  # Se retorna un mensaje de éxito
+
+# Obtener 1 documento:
+@router.get("/documento/{document_id}")
+async def get_document(document_id: int):
+    return getDocument(document_id)

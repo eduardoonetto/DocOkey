@@ -1,7 +1,15 @@
+#Database
 import sqlite3
+#Audit
 import hashlib
 import time
 from datetime import datetime
+#For Thumbnail
+import base64
+import fitz #install visual studio c++ build tools  
+from PIL import Image
+import io
+
 
 def initialize_database():
     connection = sqlite3.connect('database.sqlite')
@@ -328,8 +336,8 @@ def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_crea
     cursor.execute('''
         SELECT * FROM institucion WHERE id = ?
     ''', (institucion_id,))
-    institucion = cursor.fetchone()
-    if not institucion or institucion[2] == 'Personal':
+    institution = cursor.fetchone()
+    if not institution or institution[2] == 'Personal':
         connection.close()
         return {'msg': 'No se puede agregar un documento a esta institucion', 'status': 'ERROR'}
     #Validar que la persona de la session_id tenga un rol admin dentro de la institucion, primero extraer el useR_rut de la session_id:
@@ -379,6 +387,18 @@ def add_documento(nombre: str, archivo_b64: str, institucion_id: int, fecha_crea
         VALUES (?, ?, ?, ?)
     ''', (nombre, archivo_b64, institucion_id, fecha_creacion))
     documento_id = cursor.lastrowid
+    validate = True
+    for signer in signers:
+        print(institution)
+        if(signer.signer_institucion != 'Personal' and signer.signer_institucion != institution[1]):
+            print('La institucion del firmante no coincide con la institucion del documento')
+            validate = False
+            #Se podria corregir la institucion del firmante pero no se podria saber cual de los 2 params es el erroneo.
+            #signer.signer_institucion = institution[1]
+    
+    if(validate == False):
+        connection.close()
+        return {'msg': 'La institucion del firmante no coincide con la institucion del documento', 'status': 'ERROR'}
     for signer in signers:
         cursor.execute('''
             INSERT INTO firmantes(signer_rut, signer_role, signer_institucion, signer_name, signer_email, signer_type, documento_id)
@@ -430,7 +450,10 @@ def get_firmantes_by_documento_id(documento_id: int):
             'signer_name': firmante[4],
             'signer_email': firmante[5],
             'signer_type': firmante[6],
-            'documento_id': firmante[7]
+            'audit': firmante[8],
+            'fecha_firma': firmante[9],
+            'habilitado': firmante[10],
+            'tipo_accion': firmante[11]
         }
         for firmante in firmantes
     ]
@@ -665,3 +688,69 @@ def get_document_by_rut(signer_rut: str):
     ]
     return documentos
     
+def getDocument(id_documento: int):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    cursor.execute('''
+                    SELECT d.id, d.nombre, d.archivo_b64, i.institucion, i.url_logo, f.signer_rut, f.signer_role, f.signer_name, f.signer_email, f.signer_type, f.audit, f.fecha_firma, f.habilitado, f.tipo_accion
+                    FROM documentos d
+                    JOIN institucion i ON d.institucion_id = i.id
+                    JOIN firmantes f ON d.id = f.documento_id
+                    WHERE d.id = ?
+                    ''', (id_documento,))
+    documento = cursor.fetchall()[0]
+    
+    b64_pdf = documento[2].encode('utf-8')
+    # Verificar si se encontró el documento
+    if b64_pdf:
+        b64_padding = len(b64_pdf) % 4
+        if b64_padding != 0:
+            b64_pdf += '=' * (4 - b64_padding)
+        # Obtener el thumbnail en Base64
+        thumbnail_b64 = generate_thumbnail(b64_pdf)
+
+        # Imprimir el thumbnail en Base64
+        print(thumbnail_b64)
+    else:
+        print("No se encontró el documento con el ID proporcionado.")
+        
+    # Extraer el resto de la información del documento
+    documento = [
+        {
+            'id': documento[0],
+            'nombre': documento[1],
+            'thumbnail': thumbnail_b64,  # Usar el texto de la primera página como miniatura (solo para ejemplo)
+            'documento_b64': b64_pdf,
+            'institucion': documento[3],
+            'logo': documento[4],
+            'signers': get_firmantes_by_documento_id(documento[0])
+        }
+    ]
+    
+    return documento
+
+def generate_thumbnail(pdf_b64):
+    try:
+        matrix = fitz.Matrix(0.5, 0.5)
+        pdf_bytes = base64.b64decode(pdf_b64)
+        pdf_document = fitz.open(stream=pdf_bytes)
+        
+        if len(pdf_document) == 0:
+            raise ValueError("El archivo PDF está vacío o corrupto.")
+        
+        first_page = pdf_document[0]  # Obtén la primera página
+        # Guardar la imagen original
+        image = first_page.get_pixmap(matrix=matrix)
+        image_pil = Image.frombytes("RGB", [image.width, image.height], image.samples)
+        image_pil.thumbnail((267, 150), Image.ANTIALIAS)  # Redimensionar manteniendo la relación de aspecto
+        # Convertir la imagen a bytes
+        image_buffer = io.BytesIO()
+        image_pil.save(image_buffer, format="JPEG", quality=90)
+        image_bytes = image_buffer.getvalue()
+        pdf_document.close()
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        return image_b64
+    except Exception as e:
+        print("Error:", str(e))
+        print("No se pudo convertir el PDF a imagen debido a un error.")
+        return b''
