@@ -1,6 +1,6 @@
 # Backend DocOkey
 
-cp https://archivosdigitales.cl/storage/app/uploads/public/032/556/842/thumb__655_500_0_0_crop.png
+<img src="https://archivosdigitales.cl/storage/app/uploads/public/032/556/842/thumb__655_500_0_0_crop.png" width="255" height="170"  />
 
 
 ## Requisitos:
