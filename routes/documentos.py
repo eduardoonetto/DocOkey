@@ -53,4 +53,4 @@ async def handle_document_action(action: DocumentAction):
 # Obtener 1 documento:
 @router.get("/documento/{document_id}")
 async def get_document(document_id: int):
-    return getDocument(document_id)
+    return getDocument(document_id)[0]

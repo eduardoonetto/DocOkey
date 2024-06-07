@@ -438,7 +438,8 @@ def get_firmantes_by_documento_id(documento_id: int):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
     cursor.execute('''
-        SELECT * FROM firmantes WHERE documento_id = ?
+        SELECT id, signer_rut, signer_role, signer_institucion, signer_name, signer_email, signer_type, documento_id, audit, fecha_firma, habilitado, CASE  WHEN tipo_accion = 0 THEN 'Pendiente' WHEN tipo_accion = 1 THEN 'Firmado' ELSE 'Rechazado' END AS tipo_accion
+        FROM firmantes WHERE documento_id = ?
     ''', (documento_id,))
     firmantes = cursor.fetchall()
     firmantes = [
@@ -718,6 +719,7 @@ def getDocument(id_documento: int):
     documento = [
         {
             'id': documento[0],
+            'status': 'OK',
             'nombre': documento[1],
             'thumbnail': thumbnail_b64,  # Usar el texto de la primera página como miniatura (solo para ejemplo)
             'documento_b64': b64_pdf,

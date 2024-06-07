@@ -18,3 +18,7 @@ https://download.visualstudio.microsoft.com/download/pr/e73bea82-207e-4133-9167-
 ## Ejecutar aplicacion:
 
 ```uvicorn main:app --reload```
+
+## Upload Files:
+
+Pdf debe ser encriptado en Base64 with Padding para la creacion de documentos
