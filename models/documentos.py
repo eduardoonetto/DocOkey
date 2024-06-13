@@ -10,3 +10,4 @@ class Documentos(BaseModel):
     institucion_id: int
     fecha_creacion: Optional[str] = datetime.datetime.now().strftime("%d-%m-%Y")
     signers: List[Firmante]
+    signed: bool = False  # Nuevo campo para indicar si el documento está firmado

@@ -54,3 +54,33 @@ async def handle_document_action(action: DocumentAction):
 @router.get("/documento/{document_id}")
 async def get_document(document_id: int):
     return getDocument(document_id)[0]
+
+
+# Nuevas rutas para firmar documentos con FastAPI
+@router.get("/documents-signed", response_model=List[Documentos])
+def get_documents_signed(db: Session = Depends(get_db)):
+    documents = db.query(Documentos).filter(Documentos.signed == True).all()
+    if not documents:
+        raise HTTPException(status_code=404, detail="No signed documents found")
+    return documents
+
+# Crear, actualizar y eliminar documentos firmados
+@router.post("/documents-signed", response_model=Documentos)
+def create_document_signed(document: Documentos, db: Session = Depends(get_db)):
+    new_document = Documentos(**document.dict())
+    db.add(new_document)
+    db.commit()
+    db.refresh(new_document)
+    return new_document
+
+# Actualizar documento firmado
+@router.put("/documents-signed/{document_id}", response_model=Documentos)
+def update_document_signed(document_id: int, document: Documentos, db: Session = Depends(get_db)):
+    db_document = db.query(Documentos).filter(Documentos.id == document_id).first()
+    if not db_document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    for key, value in document.dict().items():
+        setattr(db_document, key, value)
+    db.commit()
+    db.refresh(db_document)
+    return db_document
