@@ -8,7 +8,8 @@ from database.sqlite import (
     reject_document,
     create_audit_entry,
     log_action,
-    getDocument
+    getDocument,
+    get_documentSigned_by_rut
 )
 import hashlib
 from datetime import datetime
@@ -54,3 +55,9 @@ async def handle_document_action(action: DocumentAction):
 @router.get("/documento/{document_id}")
 async def get_document(document_id: int):
     return getDocument(document_id)[0]
+
+
+#Obtener mis documentos firmados:
+@router.get("/documento/signed/{rut}")
+async def get_signed_documents(rut: str):
+    return get_documentSigned_by_rut(rut)

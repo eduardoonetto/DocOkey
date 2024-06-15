@@ -664,6 +664,32 @@ def validate_user(user_rut: str, user_password: str):
     return r
 
 
+def get_documentSigned_by_rut(signer_rut: str):
+    connection = sqlite3.connect('database.sqlite')
+    cursor = connection.cursor()
+    #Trae Nombre documento, nombre institucion del documento, id_documento:
+    cursor.execute('''
+                    SELECT d.id, d.nombre, i.institucion, i.url_logo, UPPER(f.signer_role)
+                    FROM firmantes f
+                    JOIN documentos d ON f.documento_id = d.id
+                    JOIN institucion i ON d.institucion_id = i.id
+                    WHERE f.signer_rut = ?
+                    AND f.habilitado = 0
+                    ''', (signer_rut,))
+    documentos = cursor.fetchall()
+    documentos = [
+        {
+            'id': documento[0],
+            'nombre': documento[1],
+            'institucion': documento[2],
+            'logo': documento[3],
+            'role': documento[4]
+        }
+        for documento in documentos
+    ]
+    return documentos
+
+
 def get_document_by_rut(signer_rut: str):
     connection = sqlite3.connect('database.sqlite')
     cursor = connection.cursor()
