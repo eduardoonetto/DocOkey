@@ -12,14 +12,14 @@ from database.sqlite import initialize_database
 from utils.session_validation import session_id_valid
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-
+import re
 # Inicia el cliente API
 app = FastAPI()
 
 # Configuración de CORS para permitir solicitudes desde el origen de tu aplicación Ionic
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8100"],  # Corrige la URL, elimina la barra diagonal al final
+    allow_origins=["*"],  # Corrige la URL, elimina la barra diagonal al final
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,7 +29,7 @@ app.add_middleware(
 class AddCORSHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8100'
+        response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS, PUT, DELETE'
         response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
         return response
@@ -46,7 +46,7 @@ async def print_request_headers(request: Request, call_next):
     print(f"Session ID: {session_id}")
 
     path = request.url.path
-    if path in ["/login", "/docs", "/openapi.json", "/users/registro", "/view-pdf"] or request.method == "OPTIONS":
+    if path in ["/login", "/docs", "/openapi.json", "/users/registro", "/view-pdf"] or re.match(r"^/view-pdf", path) or request.method == "OPTIONS":
         response = await call_next(request)
         return response
 

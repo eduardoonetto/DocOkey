@@ -63,7 +63,7 @@ async def get_document(document_id: int):
 async def get_signed_documents(rut: str):
     return get_documentSigned_by_rut(rut)
 
-@router.get("/view-pdf")
+@router.get("/view-pdf/{id_documento}")
 async def view_pdf(id_documento: int):
     try:
         # Decode the base64 PDF
