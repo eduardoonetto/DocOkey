@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from models.documentos import Documentos
 from models.document_action import DocumentAction
 from database.sqlite import (
@@ -11,7 +12,7 @@ from database.sqlite import (
     getDocument,
     get_documentSigned_by_rut
 )
-import hashlib
+import hashlib, base64, io
 from datetime import datetime
 from fastapi.security import APIKeyHeader
 
@@ -61,3 +62,17 @@ async def get_document(document_id: int):
 @router.get("/documento/signed/{rut}")
 async def get_signed_documents(rut: str):
     return get_documentSigned_by_rut(rut)
+
+@router.get("/view-pdf")
+async def view_pdf(id_documento: int):
+    try:
+        # Decode the base64 PDF
+        base64_pdf = getDocument(id_documento)[0][4]
+        pdf_data = base64.b64decode(base64_pdf)
+        pdf_io = io.BytesIO(pdf_data)
+        # Create a StreamingResponse to serve the PDF
+        response = StreamingResponse(pdf_io, media_type="application/pdf")
+        response.headers["Content-Disposition"] = "inline; filename=example.pdf"
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

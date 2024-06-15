@@ -46,7 +46,7 @@ async def print_request_headers(request: Request, call_next):
     print(f"Session ID: {session_id}")
 
     path = request.url.path
-    if path in ["/login", "/docs", "/openapi.json", "/users/registro"] or request.method == "OPTIONS":
+    if path in ["/login", "/docs", "/openapi.json", "/users/registro", "/view-pdf"] or request.method == "OPTIONS":
         response = await call_next(request)
         return response
 
