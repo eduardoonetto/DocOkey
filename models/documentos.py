@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional, List
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from database import Base
 import datetime
 from models.firmante import Firmante
 
@@ -10,4 +10,3 @@ class Documentos(BaseModel):
     institucion_id: int
     fecha_creacion: Optional[str] = datetime.datetime.now().strftime("%d-%m-%Y")
     signers: List[Firmante]
-    signed: bool = False  # Nuevo campo para indicar si el documento está firmado
